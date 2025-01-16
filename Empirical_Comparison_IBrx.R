@@ -48,26 +48,6 @@ stocks <- read_excel("Data/economatica_b3.xlsx", skip = 3, na = c("-", "NA")) |>
   filter(dates <= '2023-12-01')
 colnames(stocks) <- str_replace(colnames(stocks), "Retorno\ndo fechamento\nem 1 meses\nEm moeda orig\najust p/ prov\n", "")
 
-ibovespa <- read_excel("Data/economatica_ibov.xlsx", skip = 3, na = c("-", "NA")) |> 
-  mutate(Data = str_replace(Data, "Jan", "01"), 
-         Data = str_replace(Data, "Fev", "02"),
-         Data = str_replace(Data, "Mar", "03"), 
-         Data = str_replace(Data, "Abr", "04"),
-         Data = str_replace(Data, "Mai", "05"), 
-         Data = str_replace(Data, "Jun", "06"),
-         Data = str_replace(Data, "Jul", "07"), 
-         Data = str_replace(Data, "Ago", "08"),
-         Data = str_replace(Data, "Set", "09"), 
-         Data = str_replace(Data, "Out", "10"),
-         Data = str_replace(Data, "Nov", "11"), 
-         Data = str_replace(Data, "Dez", "12")) |> 
-  mutate(dates = lubridate::my(Data)) |> 
-  select(-Data) |> 
-  select(dates, everything()) |> 
-  filter(dates >= '1997-12-01') |> 
-  filter(dates <= '2023-12-01')
-colnames(ibovespa) <- str_replace(colnames(ibovespa), "Retorno\ndo fechamento\nem 1 meses\nEm moeda orig\najust p/ prov\n", "")
-
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #       General Settings       #  
