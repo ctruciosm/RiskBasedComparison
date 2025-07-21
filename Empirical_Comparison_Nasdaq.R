@@ -14,6 +14,7 @@ library(ShrinkCovMat)
 library(readr)
 library(kableExtra)
 library(lmf)
+library(matrixcalc)
 source("utils.R")
 
 
@@ -23,12 +24,20 @@ for (name in shrinkage_names) source(name)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #            Data              #  
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-nasdaq_active <- read_excel("./Data/nasdaq_mensal_ativos.xlsx", skip = 3, na = c("-", "NA"))
-nasdaq_delisted <- read_excel("./Data/nasdaq_mensal_inativos.xlsx", skip = 3, na = c("-", "NA"))[, -1]
-nasdaq <- cbind(nasdaq_active, nasdaq_delisted)
+
+market <- "B3" # B3
+
+if (market == "nasdaq") {
+  assets_active <- read_excel("./Data/nasdaq_mensal_ativos.xlsx", skip = 3, na = c("-", "NA"))
+  assets_delisted <- read_excel("./Data/nasdaq_mensal_inativos.xlsx", skip = 3, na = c("-", "NA"))[, -1]
+  assets <- cbind(assets_active, assets_delisted)
+} else {
+  assets <- read_excel("./Data/retornos_mensal_b3.xlsx", skip = 3, na = c("-", "NA"))
+}
 
 
-stocks <- nasdaq |> 
+
+stocks <- assets |> 
   mutate(Data = str_replace(Data, "Jan", "01"), 
          Data = str_replace(Data, "Fev", "02"),
          Data = str_replace(Data, "Mar", "03"), 
@@ -45,21 +54,30 @@ stocks <- nasdaq |>
   select(-Data) |> 
   select(dates, everything()) |> 
   filter(dates >= '1997-12-01') |> 
-  filter(dates <= '2023-12-01')
+  filter(dates <= '2025-06-01')
 colnames(stocks) <- str_replace(colnames(stocks), "Retorno\ndo fechamento\nem 1 meses\nEm moeda orig\najust p/ prov\n", "")
+
+
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #       General Settings       #  
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
-InS <- 120
+InS <- 120          # Dont touch
+last_obs <- 60     # 60 or 120 or 252
 OoS <- nrow(stocks) - InS
 p <- ncol(stocks) - 1
 nmethods <- 10
 
-cov_shrinkages <- c(stats::cov, cov1Para, cov2Para, covCor, covDiag, nlshrink_cov, nlShrinkLWEst, gis, lis, qis)
+if (last_obs == 252) {
+  assets_daily <- read_excel("./Data/retornos_diarios_b3.xlsx", skip = 3, na = c("-", "NA"), col_types = c("date", rep("numeric", 1410)))
+  colnames(assets_daily) <- str_replace(colnames(assets_daily), "Retorno\ndo fechamento\nem 1 dias\nEm moeda orig\najust p/ prov\n", "")
+  assets_daily$Data <- lubridate::ymd(assets_daily$Data)
+}
 
-for (s in 6) {
+cov_shrinkages <- c(stats::cov, cov1Para, cov2Para, covCor, covDiag, cov_nlshrink, nlShrinkLWEst, gis, lis, qis, cvc_shrinkage)
+
+for (s in c(6, 7, 10, 11)) {
   cov_estim = cov_shrinkages[s][[1]]
   w_ew_full = w_mv_full = w_iv_full = w_rp_full = w_md_full = w_mde_full = w_hrp_full = w_hcaa_full = w_herc_full = w_dhrp_full = matrix(0, nrow = OoS, ncol = p, dimnames = list(NULL, colnames(stocks)[-1]))
   Rport <- matrix(NA, nrow = OoS, ncol = nmethods, dimnames = list(NULL, c("ew", "mv", "iv", "rp", "md", "mde", "hrp", "hcaa", "herc", "dhrp")))
@@ -70,25 +88,37 @@ for (s in 6) {
   #    Out-of-sample exercise    #  
   #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
   r_oos_full <- matrix(NA, ncol = p, nrow = 1, dimnames = list(NULL, colnames(stocks)[-1]))
-  
+  n_assets_portfolio <- rep(0, OoS)
   for (i in 1:OoS) { 
-    print(i)
+    print(paste("Shrinkage method", s, "iteration", i, "of", OoS))
     window_stocks <- stocks[i:(InS - 1 + i + 1), -1]
     window_stocks <- window_stocks[, which(sapply(window_stocks, function(y) sum(length(which(is.na(y))))) == 0)]
+    window_stocks <- window_stocks[1:InS, ]
+    aux <- colnames(window_stocks)
+    
+    if (last_obs == 252) {
+      daily_returns <- assets_daily |> select(Data, all_of(all_of(aux))) |> dplyr::filter(Data < stocks[InS + i, ]$dates) |> filter(!if_all(where(is.numeric), is.na)) 
+      window_stocks <-  daily_returns |> tail(252) |> select(all_of(aux))
+      window_stocks[is.na(window_stocks)] <- 0 # Illiquidity
+    }
     
     n_assets <- ncol(window_stocks)
-    r_oos <- tail(window_stocks, 1)
-    aux <- colnames(window_stocks)
+    r_oos <- stocks[InS + i, ] |> select(all_of(aux)) |> as.matrix()
     r_oos_full[1, aux] <- as.numeric(r_oos)
+    n_assets_portfolio[i] <- n_assets
     
-    cova <- cov_estim(window_stocks[1:InS, ])
+    retu_ins <- as.matrix(tail(window_stocks, last_obs))
+    
+    cova <- cov_estim(retu_ins)
+    cova <- (cova + t(cova))/2
     set.seed(i)
     w_ew <- rep(1/n_assets, n_assets)
     w_hrp <- HRP_Portfolio(cova)$weights
     w_hcaa <- HCAA_Portfolio(cova)$weights
     w_herc <- HERC_Portfolio(cova)$weights
     w_dhrp <- DHRP_Portfolio(cova)$weights
-    if(det(cova) > 0) {
+    
+    if(is.symmetric.matrix(cova) && is.positive.definite(cova)) {
       w_mv <- optimalPortfolio(Sigma = cova, control = list(type = 'minvol', constraint = 'lo'))
       w_mde <-optimalPortfolio(Sigma = cova, control = list(type = 'maxdec', constraint = 'lo'))
       w_iv <- optimalPortfolio(Sigma = cova, control = list(type = 'invvol', constraint = 'lo'))
@@ -133,7 +163,9 @@ for (s in 6) {
     }   
   }
   
-  write.table(Rport, paste0("Results/Rport_", InS, "_ls_", s - 1, "_nasdaq.csv"), sep = ",")
+  write.table(Rport, paste0("Results/Rport_", InS, "_last_", last_obs, "_ls_", s - 1, "_", market, ".csv"), sep = ",")
+  write.table(n_assets_portfolio, paste0("Results/n_assets_portfolio", InS, "_last_", last_obs, "_ls_", s - 1, "_", market, ".csv"), sep = ",")
+  
   
   Caption <- "Out-of-sample performance measures of the minimum variance portfolio with short-selling constraints: AV, SD, SR, ASR, SO, TO and SSPW stand for the average, standard deviation, Sharpe ratio, Adjusted Sharpe ratio, Sortino ratio, average turnover and average sum of squared portfolio weights, respectively."
   oos_results <- rbind(apply(Rport[, 1:nmethods], 2, medidas),
@@ -144,7 +176,8 @@ for (s in 6) {
   t(oos_results) %>%
     knitr::kable(digits = 4, format = "latex", align = "lccccccc", caption = Caption,
                  table.envir = "table", label = "empirical_mvp") %>%
-    save_kable(keep_tex = T, file = paste0("Results/risk-based_", InS, "_ls_", s - 1, "_nasdaq.tex"))
+    save_kable(keep_tex = T, file = paste0("Results/risk-based_", InS, "_last_", last_obs, "_ls_", s - 1, "_", market, ".tex"))
+
 }
   
   
