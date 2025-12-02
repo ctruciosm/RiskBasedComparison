@@ -1,9 +1,9 @@
 # RiskBasedComparison
 
-Codes to replicate the results in Trucíos (2025). 
+To replicate the results reported in Trucíos (2025), use the script `Empirical_Comparison_Large_Panels.R` and set the `market` argument (line 29) as follows:
 
-- Brazilian case: `Empirical_Comparison_IBrx.R`
-- US case: `Empirical_Comparison_Nasdaq.R`
+- Brazilian case: `market <- "B3"`
+- US case: `market <- "US"`
 
 
 ## References
