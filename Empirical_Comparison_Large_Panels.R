@@ -29,9 +29,6 @@ for (name in shrinkage_names) source(name)
 market <- "US" # B3
 
 if (market == "US") {
-  #assets_active <- read_excel("./Data/daily_prices_nyse_active.xlsx", skip = 3, na = c("-", "NA"), col_types = c("date", rep("numeric", 1372)))
-  #assets_delisted <- read_excel("./Data/daily_prices_nyse_delisted.xlsx", skip = 3, na = c("-", "NA"), col_types = c("date", rep("numeric", 1011)))[, -2]
-  #assets <- left_join(assets_active, assets_delisted, by = "Data")
   assets <- suppressWarnings(read_csv("./Data/daily_prices_nyse_stooq.csv", col_types = c("D", rep("d", 3515)))) |> rename(Data = DATA)
 } else {
   assets <- read_excel("./Data/daily_prices_b3_all.xlsx", skip = 3, na = c("-", "NA"), col_types = c("date", rep("numeric", 1410)))
@@ -46,8 +43,6 @@ stocks <- assets |>
   mutate_if(is.numeric, ~ (./lag(.) - 1)) |> 
   filter(!if_all(where(is.numeric), is.na))
     
-
-dim(stocks)
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
 #       General Settings       #  
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%#
@@ -59,7 +54,7 @@ p <- ncol(stocks) - 1
 nmethods <- 10
 cov_shrinkages <- c(stats::cov, cov1Para, cov2Para, covCor, covDiag, cov_nlshrink, nlShrinkLWEst, qis, cvc_shrinkage)
 
-for (s in 1:9) {
+for (s in 1 : length(cov_shrinkages)) {
   cov_estim = cov_shrinkages[s][[1]]
   w_ew_full = w_mv_full = w_iv_full = w_rp_full = w_md_full = w_mde_full = w_hrp_full = w_hcaa_full = w_herc_full = w_dhrp_full = matrix(NA, nrow = OoS, ncol = p, dimnames = list(NULL, colnames(stocks)[-1]))
   Rport <- matrix(NA, nrow = OoS, ncol = nmethods, dimnames = list(NULL, c("ew", "mv", "iv", "rp", "md", "mde", "hrp", "hcaa", "herc", "chrp")))
