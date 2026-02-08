@@ -10,7 +10,7 @@ The datasets used in this paper are not available in this repository due to lice
 ## Additional codes
 
 - `Figure.R` replicates Figure 1.
-- `Bootstrap_Tests.R` performs the pair-wise tests of Ledoit and Wolf (2008, 2011).
+- `Bootstrap_Tests.R` performs the bootstrap tests of Ledoit and Wolf (2008, 2011).
 
 ## References
 
