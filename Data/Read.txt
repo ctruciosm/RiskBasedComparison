@@ -1,0 +1,4 @@
+The datasets used in this paper are not included in this repository due to licensing restrictions (Brazilian data) or file-size limitations (US data). The U.S. dataset can be obtained from the following link:  https://www.dropbox.com/scl/fo/yq22t7ijyo4o81u460htl/APC0dfipF-I0cLrYkhnlrEU?rlkey=jjly8n770h86syfqbz0qrouzt&st=kspdtak9&dl=0 
+
+
+After downloading the data, place it in this folder and run the “Empirical_Comparison_Large_Panels.R” script to replicate the results for the U.S. market.
